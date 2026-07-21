@@ -2,6 +2,10 @@ name: Create AMD Ubuntu
 
 on:
   workflow_dispatch:
+    inputs:
+      dummy:
+        description: 'Click Run'
+        required: false
 
 jobs:
   create:
@@ -9,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
-        with: {php-version: "8.3"}
+        with: {php-version: '8.3'}
       - run: composer install --prefer-dist --no-progress
       - run: |
           echo "${{ secrets.OCI_PRIVATE_KEY }}" > /tmp/oci_key.pem
@@ -41,4 +45,3 @@ jobs:
           T: ${{ secrets.PUSHPLUS_TOKEN }}
           O: ${{ steps.c.outputs.OUT }}
         run: curl -s -X POST http://www.pushplus.plus/send -H "Content-Type: application/json" -d "{\"token\":\"${T}\",\"title\":\"AMD Ubuntu Ready\",\"content\":\"<pre>${O}</pre>\",\"template\":\"html\"}"
-
