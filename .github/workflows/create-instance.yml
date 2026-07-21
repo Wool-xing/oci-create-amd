@@ -43,3 +43,48 @@ jobs:
           CACHE_AVAILABILITY_DOMAINS: 1
           TOO_MANY_REQUESTS_TIME_WAIT: 60
         run: php index.php
+
+  fix-www:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: {php-version: '8.3'}
+      - run: composer install --prefer-dist --no-progress
+      - run: |
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > /tmp/oci_key.pem && chmod 600 /tmp/oci_key.pem
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key && chmod 600 /tmp/ssh_key
+      - name: Restore OCI security rules
+        env:
+          U: ocid1.user.oc1..aaaaaaaarcfcfjovuaim6ga55repfnjzonscc2p6265awjw454mc5wf7shhq
+          T: ocid1.tenancy.oc1..aaaaaaaaw32ngyf5nyfxt4ju7ag53mss3hpj7jdt5gbhezlrqwqvnqh2ywha
+          F: 3e:47:65:7c:46:06:46:86:bc:83:de:bd:39:1e:be:04
+        run: |
+          php -r '
+          require_once "vendor/autoload.php";
+          $c = new \Hitrov\OciConfig("ap-tokyo-1",getenv("U"),getenv("T"),getenv("F"),"/tmp/oci_key.pem","","","",1,1);
+          $a = new \Hitrov\OciApi();
+          $sl = "ocid1.securitylist.oc1.ap-tokyo-1.aaaaaaaa3kaxs42iphcy2oibvxe5qebz5kkzxv3cgwvpwdp7hv5zunumfiaa";
+          $ports = [[22,"SSH"],[80,"HTTP"],[443,"HTTPS"],[8080,"Nginx"]];
+          $r = [];
+          foreach($ports as $p) $r[] = ["source"=>"0.0.0.0/0","protocol"=>"6","tcpOptions"=>["destinationPortRange"=>["min"=>$p[0],"max"=>$p[0]]],"description"=>$p[1]];
+          $url = "https://iaas.ap-tokyo-1.oraclecloud.com/20160918/securityLists/".$sl."/";
+          $a->call($c,$url,"PUT",json_encode(["ingressSecurityRules"=>$r])); echo "Rules OK\n";
+          '
+      - name: Fix iptables + Apache www + SSL
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i /tmp/ssh_key ubuntu@141.147.169.200 '
+          for p in 22 80 443 8080; do sudo iptables -I INPUT 1 -p tcp --dport $p -j ACCEPT 2>/dev/null; done
+          sudo netfilter-persistent save 2>/dev/null
+          sudo systemctl restart ssh
+          sudo tee /etc/apache2/sites-available/wool.conf > /dev/null << END
+<VirtualHost *:80>
+    ServerName wool.cc.cd
+    ServerAlias www.wool.cc.cd
+    DocumentRoot /var/www/wool
+</VirtualHost>
+END
+          sudo systemctl reload apache2
+          sudo certbot --apache -d wool.cc.cd -d www.wool.cc.cd --expand --non-interactive --agree-tos --email admin@wool.cc.cd 2>&1 | tail -5
+          '
