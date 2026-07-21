@@ -1,0 +1,20 @@
+name: Start Apache
+
+on:
+  workflow_dispatch:
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+      - name: Start Apache and open firewall
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i /tmp/ssh_key ubuntu@141.147.169.200 '
+            sudo systemctl start apache2
+            sudo systemctl status apache2 --no-pager
+            curl -s localhost | head -5
+          '
