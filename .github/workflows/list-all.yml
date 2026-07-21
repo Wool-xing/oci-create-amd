@@ -1,0 +1,26 @@
+name: List All
+on:
+  workflow_dispatch:
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: {php-version: '8.3'}
+      - run: composer install --prefer-dist --no-progress
+      - run: |
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > /tmp/oci_key.pem
+          chmod 600 /tmp/oci_key.pem
+      - env:
+          T: ocid1.tenancy.oc1..aaaaaaaaw32ngyf5nyfxt4ju7ag53mss3hpj7jdt5gbhezlrqwqvnqh2ywha
+        run: |
+          php -r '
+          require_once "vendor/autoload.php";
+          $c = new \Hitrov\OciConfig("ap-tokyo-1",getenv("OCI_USER_ID"),getenv("OCI_TENANCY_ID"),getenv("OCI_KEY_FINGERPRINT"),"/tmp/oci_key.pem","","","",1,1);
+          $a = new \Hitrov\OciApi();
+          $base = "https://iaas.ap-tokyo-1.oraclecloud.com/20160918/instances";
+          $p = ["compartmentId"=>getenv("T"),"sortBy"=>"TIMECREATED","sortOrder"=>"DESC","limit"=>10];
+          $d = $a->call($c,$base,"GET",null,$p);
+          foreach($d as $i) echo ($i["display-name"]??"?")." | ".($i["lifecycle-state"]??"?")." | ".($i["shape"]??"?")."\n";
+          '
