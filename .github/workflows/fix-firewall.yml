@@ -1,0 +1,26 @@
+name: Fix Firewall
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+      - run: |
+          ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key ubuntu@141.147.169.200 '
+          echo "=== iptables ==="
+          sudo iptables -L -n 2>/dev/null || echo "no iptables"
+          echo "=== ufw ==="
+          sudo ufw status 2>/dev/null || echo "no ufw"
+          echo "=== apache listen ==="
+          sudo ss -tlnp | grep -E "80|443"
+          echo "=== FIX: ensure apache listens on all interfaces ==="
+          sudo sed -i "s/Listen 80/Listen 0.0.0.0:80/g" /etc/apache2/ports.conf 2>/dev/null
+          sudo systemctl restart apache2
+          echo "Apache restarted"
+          '
