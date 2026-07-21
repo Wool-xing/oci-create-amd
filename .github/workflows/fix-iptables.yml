@@ -13,13 +13,34 @@ jobs:
           chmod 600 /tmp/ssh_key
       - run: |
           ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key ubuntu@141.147.169.200 '
-          echo "=== IPTABLES ==="
-          sudo iptables -L INPUT -n -v 2>&1
-          echo "=== APACHE LISTEN ==="
-          sudo netstat -tlnp 2>/dev/null || sudo ss -tlnp
-          echo "=== FIX iptables ==="
-          sudo iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
-          sudo iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
-          echo "=== VERIFY ==="
-          sudo iptables -L INPUT -n | grep -E "80|443"
+          echo "=== Setup SSL ==="
+          sudo apt update -y && sudo apt install -y openssl 2>/dev/null
+          sudo a2enmod ssl
+          sudo mkdir -p /etc/apache2/ssl
+          if [ ! -f /etc/apache2/ssl/apache.crt ]; then
+            sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+              -keyout /etc/apache2/ssl/apache.key \
+              -out /etc/apache2/ssl/apache.crt \
+              -subj "/C=CN/ST=Beijing/L=Beijing/O=Personal/CN=141.147.169.200"
+          fi
+          sudo tee /etc/apache2/sites-available/default-ssl.conf > /dev/null << ENDSSL
+<VirtualHost *:443>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html
+    SSLEngine on
+    SSLCertificateFile /etc/apache2/ssl/apache.crt
+    SSLCertificateKeyFile /etc/apache2/ssl/apache.key
+    <Directory /var/www/html>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+ENDSSL
+          sudo a2ensite default-ssl 2>/dev/null
+          sudo systemctl reload apache2
+          echo "=== Verify HTTPS ==="
+          curl -sk https://localhost | head -5
           '
