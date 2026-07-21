@@ -1,12 +1,7 @@
 name: Create AMD Ubuntu
 
 on:
-  push:
   workflow_dispatch:
-    inputs:
-      dummy:
-        description: 'Click Run'
-        required: false
 
 jobs:
   create:
@@ -19,7 +14,7 @@ jobs:
       - run: |
           echo "${{ secrets.OCI_PRIVATE_KEY }}" > /tmp/oci_key.pem
           chmod 600 /tmp/oci_key.pem
-      - id: c
+      - id: create
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
@@ -35,14 +30,10 @@ jobs:
           OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
           CACHE_AVAILABILITY_DOMAINS: 1
           TOO_MANY_REQUESTS_TIME_WAIT: 60
-        run: |
-          O=$(php index.php 2>&1)
-          echo "$O"
-          echo "OUT<<X" >> $GITHUB_OUTPUT
-          echo "$O" >> $GITHUB_OUTPUT
-          echo "X" >> $GITHUB_OUTPUT
+        run: php index.php | tee /tmp/oci-output.txt
       - name: Notify
         env:
           T: ${{ secrets.PUSHPLUS_TOKEN }}
-          O: ${{ steps.c.outputs.OUT }}
-        run: curl -s -X POST http://www.pushplus.plus/send -H "Content-Type: application/json" -d "{\"token\":\"${T}\",\"title\":\"AMD Ubuntu Ready\",\"content\":\"<pre>${O}</pre>\",\"template\":\"html\"}"
+        run: |
+          O=$(cat /tmp/oci-output.txt | head -c 500)
+          curl -s http://www.pushplus.plus/send -H "Content-Type: application/json" -d "{\"token\":\"${T}\",\"title\":\"AMD Ubuntu\",\"content\":\"<pre>${O}</pre>\"}"
