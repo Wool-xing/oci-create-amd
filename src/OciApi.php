@@ -66,7 +66,7 @@ class OciApi
     "availabilityDomain": "$availabilityDomain",
     "sourceDetails": {$config->getSourceDetails()},
     "createVnicDetails": {
-        "assignPublicIp": false,
+        "assignPublicIp": true,
         "subnetId": "{$config->subnetId}",
         "assignPrivateDnsRecord": true
     },
