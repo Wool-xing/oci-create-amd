@@ -14,26 +14,19 @@ jobs:
       - run: |
           echo "${{ secrets.OCI_PRIVATE_KEY }}" > /tmp/oci_key.pem
           chmod 600 /tmp/oci_key.pem
-      - name: Kill old instances
+      - name: Kill old
         continue-on-error: true
         env:
-          U: ocid1.user.oc1..aaaaaaaarcfcfjovuaim6ga55repfnjzonscc2p6265awjw454mc5wf7shhq
-          T: ocid1.tenancy.oc1..aaaaaaaaw32ngyf5nyfxt4ju7ag53mss3hpj7jdt5gbhezlrqwqvnqh2ywha
-          F: 3e:47:65:7c:46:06:46:86:bc:83:de:bd:39:1e:be:04
-        run: |
-          for id in \
-            ocid1.instance.oc1.ap-tokyo-1.anxhiljrrqqkxxqc34ldrtysjvnrz6w3ixdplgghy3i24jn3xvqyap72i4qa \
-            ocid1.instance.oc1.ap-tokyo-1.anxhiljrrqqkxxqcgk2h4afv4pxyiiutr3fj6jmbl3slrark3kmuigzvpuia; do
-            php -r "
-            require_once 'vendor/autoload.php';
-            \$c = new \Hitrov\OciConfig('ap-tokyo-1',getenv('U'),getenv('T'),getenv('F'),'/tmp/oci_key.pem','','','',1,1);
-            \$a = new \Hitrov\OciApi();
-            try { \$a->call(\$c,'https://iaas.ap-tokyo-1.oraclecloud.com/20160918/instances/'.\$id,'DELETE');echo \"Deleted\n\"; }
-            catch(\Exception \$e){echo(strpos(\$e->getMessage(),'JSON')!==false||strpos(\$e->getMessage(),'Syntax')!==false)?\"Deleted\n\":\"ERR \".\$e->getMessage().\"\n\";}
-            " && echo "Killed $id"
-          done
+          OCI_REGION: ap-tokyo-1
+          OCI_USER_ID: ocid1.user.oc1..aaaaaaaarcfcfjovuaim6ga55repfnjzonscc2p6265awjw454mc5wf7shhq
+          OCI_TENANCY_ID: ocid1.tenancy.oc1..aaaaaaaaw32ngyf5nyfxt4ju7ag53mss3hpj7jdt5gbhezlrqwqvnqh2ywha
+          OCI_KEY_FINGERPRINT: 3e:47:65:7c:46:06:46:86:bc:83:de:bd:39:1e:be:04
+          OCI_PRIVATE_KEY_FILENAME: /tmp/oci_key.pem
+          OCI_SUBNET_ID: ocid1.subnet.oc1.ap-tokyo-1.aaaaaaaaja6c5ybdagcrrcgacrvbtbbo2owvp74b2sfzljj6gglxuok5dcjq
+          OCI_IMAGE_ID: ocid1.image.oc1.ap-tokyo-1.aaaaaaaa5xvmxb5y7np7tunegntczkjzb376ou63xif5flq3zo44r7lo3oaq
+        run: php kill.php
       - run: sleep 15
-      - id: create
+      - name: Create
         env:
           OCI_REGION: ap-tokyo-1
           OCI_USER_ID: ocid1.user.oc1..aaaaaaaarcfcfjovuaim6ga55repfnjzonscc2p6265awjw454mc5wf7shhq
@@ -49,7 +42,4 @@ jobs:
           OCI_SSH_PUBLIC_KEY: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDcH5sm7No7ju7vkww2bKHg8gn8DKk/WqBAmw87VMSD2h+SsWRHZ5cXn5KFRlEtl0xADcALlH+FF8A7ZhH+FP2GXlV11tbR1YSpT3ApW07H2xLEizmXzJqSBl4yAO7zl4d/dfcIHpGIgVkQXm52ifOKIaFGSP2KzT8LcI9htHDH7ygp76x5X6mAJk+E0ITUP7ZdSgmIyF/dJAVhqHF0qTXmVf9bdyWFAIG3YF1PmJH1bTZ7ycYygv8Qr4ebgtKVuVk6rOedj/nzTT5O8WrQmMyI73H6+114bMrofkXmaUIXQvHU1OxitVmxbU6RQdgtIc1ncJxU+8fYE167sKeXCCg4gd/w5BCnXG2Fd5L6A4JIA0f5tZlExKtwtdF3Ll8sSLXzByu8PckvMmLOi8OS8UkDa5X6w2cJMpyXNiRFCfhuzxtATLIHOf3Yh5Ktut9exOG86C0juIvKQ0R/0s4DuGPhJysgSIWF/j0d9els+AjGuXbh2T0ACDvKsbh/l0F/HlKXZB5UodYsV0Ac9lkCcFahlWvCWoUJFa4dmrmkverElTELM1h37y1FNuiO3cDInyxSQUfPe9exS1UyEkjOIpsrEzhN5l7fMFuJzkEY+UNAuFT6rbwkTG6jYwtifVxe90TncniOkBz5eVFFdYB3j9y18F/k0s4c1ntYWj7Vocd0Gw== admin@LAPTOP-QEJT7THQ
           CACHE_AVAILABILITY_DOMAINS: 1
           TOO_MANY_REQUESTS_TIME_WAIT: 60
-        run: php index.php | tee /tmp/out.txt
-      - run: |
-          O=$(cat /tmp/out.txt | head -c 500)
-          curl -s "http://www.pushplus.plus/send?token=${{ secrets.PUSHPLUS_TOKEN }}&title=AMD+Ubuntu+Ready&content=$(echo "$O" | head -c 200)"
+        run: php index.php
