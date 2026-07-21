@@ -16,36 +16,12 @@ jobs:
           chmod 600 /tmp/oci_key.pem
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
-      - name: Add ingress rules (port 80, 443)
-        env:
-          U: ocid1.user.oc1..aaaaaaaarcfcfjovuaim6ga55repfnjzonscc2p6265awjw454mc5wf7shhq
-          T: ocid1.tenancy.oc1..aaaaaaaaw32ngyf5nyfxt4ju7ag53mss3hpj7jdt5gbhezlrqwqvnqh2ywha
-          F: 3e:47:65:7c:46:06:46:86:bc:83:de:bd:39:1e:be:04
+      - name: Restore security rules (SSH+HTTP+HTTPS)
+        run: php fix-rules.php
+      - name: Install Apache
         run: |
-          php -r '
-          require_once "vendor/autoload.php";
-          $c = new \Hitrov\OciConfig("ap-tokyo-1",getenv("U"),getenv("T"),getenv("F"),"/tmp/oci_key.pem","","","",1,1);
-          $a = new \Hitrov\OciApi();
-          $sl = "ocid1.securitylist.oc1.ap-tokyo-1.aaaaaaaa3kaxs42iphcy2oibvxe5qebz5kkzxv3cgwvpwdp7hv5zunumfiaa";
-          $rules = [
-            ["source"=>"0.0.0.0/0","protocol"=>"6","dstPort"=>"80","desc"=>"HTTP"],
-            ["source"=>"0.0.0.0/0","protocol"=>"6","dstPort"=>"443","desc"=>"HTTPS"]
-          ];
-          foreach ($rules as $r) {
-            $body = json_encode(["ingressSecurityRules"=>[[
-              "source"=>$r["source"],"protocol"=>$r["protocol"],
-              "tcpOptions"=>["destinationPortRange"=>["min"=>(int)$r["dstPort"],"max"=>(int)$r["dstPort"]]],
-              "description"=>$r["desc"]
-            ]]]);
-            $url = "https://iaas.ap-tokyo-1.oraclecloud.com/20160918/securityLists/".$sl;
-            try { $a->call($c,$url."/", "PUT", $body); echo "Added ".$r["desc"]."\n"; }
-            catch(\Exception $e){ echo "Err: ".$e->getMessage()."\n"; }
-          }
-          '
-      - name: Install Apache via SSH
-        run: |
-          ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key ubuntu@141.147.169.200 '
-            sudo apt update -y && sudo apt install apache2 -y && sudo systemctl enable apache2 && sudo systemctl start apache2 && echo "Apache installed and running"
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i /tmp/ssh_key ubuntu@141.147.169.200 '
+            sudo apt update -y && sudo apt install apache2 -y && sudo systemctl enable apache2 && sudo systemctl start apache2
           '
       - name: Verify
-        run: curl -s -o /dev/null -w "%{http_code}" http://141.147.169.200 || echo "checking..."
+        run: curl -s -o /dev/null -w "%{http_code}" http://141.147.169.200
