@@ -1,6 +1,7 @@
 name: Create AMD Ubuntu
 
 on:
+  push:
   workflow_dispatch:
     inputs:
       dummy:
