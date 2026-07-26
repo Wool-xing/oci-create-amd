@@ -1,0 +1,48 @@
+name: Restart OCI Server
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Server to restart'
+        required: true
+        type: choice
+        options:
+          - web1
+          - app1
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install OCI CLI
+        run: |
+          curl -sSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash -s -- --accept-all-defaults
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Configure OCI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/oci_key.pem
+          chmod 600 ~/.oci/oci_key.pem
+          cat > ~/.oci/config << 'CFG'
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_ID }}
+          fingerprint=${{ secrets.OCI_KEY_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_ID }}
+          region=${{ secrets.OCI_REGION }}
+          key_file=~/.oci/oci_key.pem
+          CFG
+
+      - name: Restart Instance
+        run: |
+          if [ "${{ inputs.target }}" = "web1" ]; then
+            ID="${{ secrets.OCI_WEB1_OCID }}"
+            NAME="Web1 (Wool)"
+          else
+            ID"="${{ secrets.OCI_APQ1_OCID }}"
+            NAME="App1 (Lambs)"
+          fi
+          echo "Restarting $NAME..."
+          $HOME/bin/oci compute instance action --instance-id "$ID" --action SOFTRESET --wait-for-state RUNNING
+          echo "Done: $NAME is now RUNNING"
