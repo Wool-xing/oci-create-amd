@@ -1,0 +1,49 @@
+name: WeChat Commands
+on:
+  repository_dispatch:
+    types: [wx-command]
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+
+      - name: Status
+        if: ${{ github.event.client_payload.command == 'status' || github.event.client_payload.command == 's' }}
+        run: |
+          W=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/ssh_key ubuntu@${{ secrets.WOOL_PUBLIC_IP }} "free -h | grep Mem; uptime")
+          A=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/ssh_key ubuntu@${{ secrets.APP1_PUBLIC_IP }} "free -h | grep Mem; uptime")
+          curl -s -X POST "http://wxpusher.zjiecode.com/api/send/message" \
+            -H "Content-Type: application/json" \
+            -d "{\"appToken\":\"${{ secrets.WXPUSHER_TOKEN }}\",\"content\":\"Wool: $W\n\nLambs: $A\",\"contentType\":1,\"uids\":[\"${{ secrets.WXPUSHER_UID }}\"]}"
+
+      - name: Restart Wool
+        if: ${{ github.event.client_payload.command == 'restart-wool' || github.event.client_payload.command == 'rw' }}
+        run: |
+          curl -X POST "https://api.github.com/repos/${{ github.repository }}/actions/workflows/oci-restart.yml/dispatches" \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{"ref":"main","inputs":{"target":"web1"}}'
+
+      - name: Restart Lambs
+        if: ${{ github.event.client_payload.command == 'restart-lambs' || github.event.client_payload.command == 'rl' }}
+        run: |
+          curl -X POST "https://api.github.com/repos/${{ github.repository }}/actions/workflows/oci-restart.yml/dispatches" \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{"ref":"main","inputs":{"target":"app1"}}'
+
+      - name: Backup
+        if: ${{ github.event.client_payload.command == 'backup' || github.event.client_payload.command == 'b' }}
+        run: |
+          R=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/ssh_key ubuntu@${{ secrets.WOOL_PUBLIC_IP }} "/opt/wool-tools/backup-all.sh 2>&1")
+          curl -s -X POST "http://wxpusher.zjiecode.com/api/send/message" \
+            -H "Content-Type: application/json" \
+            -d "{\"appToken\":\"${{ secrets.WXPUSHER_TOKEN }}\",\"content\":\"Backup: $R\",\"contentType\":1,\"uids\":[\"${{ secrets.WXPUSHER_UID }}\"]}"

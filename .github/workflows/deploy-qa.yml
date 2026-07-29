@@ -1,0 +1,41 @@
+name: Deploy QA Frontend
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Build
+        run: |
+          cd v2-Pro版/frontend
+          npm ci
+          npm run build
+
+      - name: Deploy to Wool
+        run: |
+          cd v2-Pro版/app/static
+          tar czf /tmp/qa-web.tar.gz .
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+          scp -o StrictHostKeyChecking=no -i /tmp/ssh_key /tmp/qa-web.tar.gz ubuntu@${{ secrets.WOOL_PUBLIC_IP }}:~/
+          ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key ubuntu@${{ secrets.WOOL_PUBLIC_IP }} \
+            "sudo tar xzf ~/qa-web.tar.gz -C /var/www/site/QA_Test && sudo chown -R www-data:www-data /var/www/site/QA_Test && rm ~/qa-web.tar.gz"
+
+      - name: Purge Cloudflare Cache
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CF_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
+
+      - name: Verify
+        run: |
+          curl -sf -o /dev/null -w '%{http_code}' https://wool.cc.cd/QA_Test/
