@@ -26,5 +26,18 @@ jobs:
           CFG
       - name: List Instances
         run: |
-          $HOME/bin/oci compute instance list --compartment-id "${{ secrets.OCI_TENANCY_ID }}" --all --output table --query "data[].{Name:"display-name",OCID:id,Shape:shape,State:"lifecycle-state",AD:"availability-domain"}" | tee /tmp/instances.txt
+          $HOME/bin/oci compute instance list --compartment-id "${{ secrets.OCI_TENANCY_ID }}" --all --output json > /tmp/instances.json 2>&1 || true
+          python3 -c "
+import json
+try:
+    d = json.load(open('/tmp/instances.json'))
+    if isinstance(d, list):
+        for i in d:
+            print('INST|' + str(i.get('display-name','')) + '|' + str(i.get('id','')) + '|' + str(i.get('shape','')) + '|' + str(i.get('lifecycle-state','')) + '|' + str(i.get('availability-domain','')))
+    else:
+        print('RAW:' + open('/tmp/instances.json').read()[:500])
+except Exception as e:
+    print('ERR:' + str(e))
+    print(open('/tmp/instances.json').read()[:500])
+"
           echo "=== INSTANCES_DONE ==="
