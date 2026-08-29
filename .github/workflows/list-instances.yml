@@ -1,0 +1,30 @@
+name: List OCI Instances
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install OCI CLI
+        run: |
+          curl -sSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash -s -- --accept-all-defaults
+          echo "$HOME/bin" >> $GITHUB_PATH
+      - name: Configure OCI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/oci_key.pem
+          chmod 600 ~/.oci/oci_key.pem
+          cat > ~/.oci/config << 'CFG'
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_ID }}
+          fingerprint=${{ secrets.OCI_KEY_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_ID }}
+          region=${{ secrets.OCI_REGION }}
+          key_file=~/.oci/oci_key.pem
+          CFG
+      - name: List Instances
+        run: |
+          $HOME/bin/oci compute instance list --compartment-id "${{ secrets.OCI_TENANCY_ID }}" --all --output table --query "data[].{Name:"display-name",OCID:id,Shape:shape,State:"lifecycle-state",AD:"availability-domain"}" | tee /tmp/instances.txt
+          echo "=== INSTANCES_DONE ==="
