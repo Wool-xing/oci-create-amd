@@ -9,7 +9,6 @@ on:
         options:
           - web1
           - app1
-          - list
 
 jobs:
   restart:
@@ -35,27 +34,7 @@ jobs:
           key_file=~/.oci/oci_key.pem
           CFG
           
-      - name: List All Instances
-        if: ${{ inputs.target == 'list' }}
-        run: |
-          $HOME/bin/oci compute instance list --compartment-id "${{ secrets.OCI_TENANCY_ID }}" --all --output json > /tmp/instances.json 2>&1 || true
-          python3 -c "
-import json
-try:
-    d = json.load(open('/tmp/instances.json'))
-    if isinstance(d, list):
-        for i in d:
-            print('INST|' + str(i.get('display-name','')) + '|' + str(i.get('id','')) + '|' + str(i.get('shape','')) + '|' + str(i.get('lifecycle-state','')) + '|' + str(i.get('availability-domain','')))
-    else:
-        print('RAW:' + open('/tmp/instances.json').read()[:600])
-except Exception as e:
-    print('ERR:' + str(e))
-    print(open('/tmp/instances.json').read()[:600])
-"
-          echo "=== INSTANCES_DONE ==="
-          
       - name: Restart Instance
-        if: ${{ inputs.target != 'list' }}
         run: |
           if [ "${{ inputs.target }}" = "web1" ]; then
             ID="${{ secrets.OCI_WEB1_OCID }}"
